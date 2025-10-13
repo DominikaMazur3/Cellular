@@ -7,7 +7,12 @@
 
 Color COLORS[2] = {Color{128,128,128,255},Color{192,192,192,255}};
 
-class Button {
+class Selectable {
+        public:
+            virtual void select(bool s) {}
+};
+
+class Button : public Selectable {
     private:
         Rectangle rect;
         const char* text;
@@ -54,7 +59,7 @@ class Button {
     
 };
 
-class numberInput {
+class numberInput : public Selectable {
     private:
         Rectangle rect = {pos.x,pos.y,32,32};
         int value = 0;
@@ -65,12 +70,12 @@ class numberInput {
     public:
         numberInput(float x, float y)
             {pos = Vector2{x,y}; set_pos(pos);}
-        void focus(bool f=true) {focused = f; new_focus = f;}
+        void select(bool f=true) {focused = f; new_focus = f;}
         bool isFocusNew() {if (new_focus) {new_focus = false; return true;} else return false;}
         bool clickedInside() {return (CheckCollisionPointRec(GetMousePosition(), rect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT));}
         void set_pos(Vector2 new_pos) {pos = new_pos; rect = {pos.x,pos.y,96,48};}
         void update() {
-            if (clickedInside()) {focus();}
+            if (clickedInside()) {select();}
             if (focused) {
                 int c = GetCharPressed();
                 if (c <= '9' and c >= '0') {
@@ -302,20 +307,37 @@ int main ()
     SetWindowState(FLAG_WINDOW_RESIZABLE);
     SetWindowMinSize(640,64);
     SetTargetFPS(60);
+    widthInput.select(true);
+    int neighboursIndex = 0;
+    bool keyPressed = false;
+    Selectable* neighbours[3] = {&widthInput,&heightInput, &gridButton};
 
 	while (!WindowShouldClose())
 	{
         if (gridSize) {
             BeginDrawing();
 		    ClearBackground(COLORS[0]);
-            if (heightInput.isFocusNew()) {widthInput.focus(false);}
-            if (widthInput.isFocusNew()) {heightInput.focus(false);}
+            if (IsKeyPressed(KEY_LEFT)) {
+                neighboursIndex = std::max(0,neighboursIndex-1);
+                keyPressed = true;
+            }
+            else if (IsKeyPressed(KEY_RIGHT)) {
+                neighboursIndex = std::min(2,neighboursIndex+1);
+                keyPressed = true;
+            }
+            if (keyPressed) {
+                keyPressed = false;
+                for (int i = 0; i < 3; i++) {if (i != neighboursIndex) neighbours[i]->select(false);}
+                neighbours[neighboursIndex]->select(true);
+            }
             widthInput.update();
             heightInput.update();
+            if (heightInput.isFocusNew()) {widthInput.select(false);}
+            if (widthInput.isFocusNew()) {heightInput.select(false);}
             gridButton.draw();
             gridButton2.draw();
             DrawText("Grid size (width, height):", 32, 32, 32, BLACK);
-            if (gridButton.isPressed() && widthInput.get_value() != 0 && heightInput.get_value() != 0) {
+            if ((gridButton.isPressed() || (IsKeyPressed(KEY_ENTER) && neighboursIndex == 2)) && widthInput.get_value() != 0 && heightInput.get_value() != 0) {
                 CELLS_X = widthInput.get_value();
                 CELLS_Y = heightInput.get_value();
                 cell = createGrid();
