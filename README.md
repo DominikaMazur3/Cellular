@@ -1,10 +1,10 @@
 # Cellular
 C++ | Raylib | cellular automata  
 🚧 Development started: Jul 30, 2025  
-🌟 Features: define rules for cellular automata, update cells manually or automatically, change the rules while the program is running  
+🌟 Features: simulating user-defined rules for cellular automata, updating cells manually or automatically, the ability to reload the rules while the program is running  
 
 ## Defining rules
-Rules need to be put in `rules.txt` file in the same directory as the executable. Each rule should be in a new line.  
+Rules need to be defined in `rules.txt` file in the same directory as the executable. Each rule should be in a new line.  
 Currently only one rule type is supported:  
 `x y`  
 It means if the cell has x neighbours which value is 1 change its state to y. For example a line containing ONLY `5 0` would be interpreted as if a cell has 5 neighbours which value is 1, change its state to 0.  
