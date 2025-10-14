@@ -5,7 +5,10 @@
 #include <sstream>
 #include <string>
 
-Color COLORS[2] = {Color{128,128,128,255},Color{192,192,192,255}};
+Color COLORS[4][2] = {{Color{128,128,128,255},Color{192,192,192,255}},
+    {Color{223,255,29,255},Color{152,198,0,255}},
+    {Color{255,138,183,255},Color{255,217,222,255}},
+    {Color{38,0,66,255},{Color{0,115,155,255}}}};
 
 class Selectable {
         public:
@@ -214,6 +217,8 @@ void update(std::vector<std::vector<int>> &cell, std::vector<RULE2> rules, int n
     for (int i = 0; i < CELLS_X; i++) {for (int j = 0; j < CELLS_Y; j++) {cell[i][j] = updated[i][j];}}
 }
 
+bool pattern = false;
+
 std::vector<RULE2> readRules(bool &rulesFound, int &neighbours)
 {
     std::vector<RULE2> rules;    
@@ -241,6 +246,7 @@ std::vector<RULE2> readRules(bool &rulesFound, int &neighbours)
                     else if (line.find("4") != std::string::npos) {neighbours = 4;}
                 }
                 else if (line.find("grid") != std::string::npos) {GRID_SIZE = true;}
+                else if (line.find("pattern") != std::string::npos) {pattern = true;;}
             }
         }
     }
@@ -251,23 +257,44 @@ std::vector<RULE2> readRules(bool &rulesFound, int &neighbours)
 
 std::vector<std::vector<int>> createGrid() {
     std::vector<std::vector<int>> cell(CELLS_X, std::vector<int>(CELLS_Y,0));
-    if (CELLS_X >= 9 && CELLS_Y >= 9) {
-        cell[8][6] = 1;
-        cell[8][7] = 1;
-        cell[8][8] = 1;
-    }
     return cell;
+}
+
+std::vector<std::vector<int>> drawpattern(std::vector<std::vector<int>> cell) {
+    cell[1][1] = 1;
+    cell[2][2] = 1;
+    cell[3][1] = 1;
+    cell[1][3] = 1;
+    cell[3][3] = 1;
+    return cell;
+}
+
+void drawGrid(std::vector<std::vector<int>> &cell, Color c0, Color c1)
+{
+    const int toolsHeight = 32;    
+    // window scaling, work in progress
+    int square = std::min(GetScreenWidth(),GetScreenHeight()-toolsHeight)/std::max(CELLS_X,CELLS_Y);
+    int margin = (GetScreenWidth()-square*CELLS_X)/2;
+    for (int i = 0; i < CELLS_X; i++) {
+            for (int j = 0; j < CELLS_Y; j++) {
+                if (cell[i][j] == 0) {
+                    DrawRectangle(margin+square*i, square*j+toolsHeight, square, square, c0);
+                }
+                else if (cell[i][j] == 1) {
+                    DrawRectangle(margin+square*i, square*j+toolsHeight, square, square, c1);
+                }
+            }
+        }
 }
 
 int main ()
 {
-    bool gridSize = true;    
+    bool gridSize = true;
     bool rulesFound = true;
     int neighboursMode = 8;
     std::vector<RULE2> rules = readRules(rulesFound, neighboursMode);    
     std::vector<std::vector<int>> cell = createGrid();
     const float updateTime = 1.25;
-    const int toolsHeight = 32;
     float speed = 1.0;
     float sinceUpdate = 0;
     bool mode_auto = false;
@@ -302,6 +329,7 @@ int main ()
     std::vector<Button> *active_tools = &tools;
     
     int selectedButton = 0;
+    int selectedColor = 0;
 
 	InitWindow(640, 672, "Cellular");
     SetWindowState(FLAG_WINDOW_RESIZABLE);
@@ -316,7 +344,7 @@ int main ()
 	{
         if (gridSize) {
             BeginDrawing();
-		    ClearBackground(COLORS[0]);
+		    ClearBackground(BLUE);
             if (IsKeyPressed(KEY_LEFT)) {
                 neighboursIndex = std::max(0,neighboursIndex-1);
                 keyPressed = true;
@@ -345,7 +373,8 @@ int main ()
             if (gridButton2.isPressed()) {gridSize = false;}
             EndDrawing();
             continue;
-        }        
+        }
+        cell = drawpattern(cell);
         int buttonPressed = -1;
         if (mode_more_tools) active_tools = &more_tools;
         else if (mode_auto) active_tools = &tools_auto;
@@ -378,23 +407,15 @@ int main ()
             else {update(cell, rules, neighboursMode);}
         }
         else if (buttonPressed == 2) {
-            if (mode_auto) {speed = std::min(16.0f, speed*2);}
+            if (mode_more_tools) {selectedColor = (selectedColor+1)%4;}
+            else if (mode_auto) {speed = std::min(16.0f, speed*2);}
             else {for (int i = 0; i < 10; i++) {update(cell, rules, neighboursMode);}}
         }
         else if (buttonPressed == 3) {mode_more_tools = !mode_more_tools;}
 
-        // window scaling, work in progress
-        int square = std::min(GetScreenWidth(),GetScreenHeight()-toolsHeight)/std::max(CELLS_X,CELLS_Y);
-        int margin = (GetScreenWidth()-square*CELLS_X)/2;
-
         BeginDrawing();
 		ClearBackground(BLACK);
-		for (int i = 0; i < CELLS_X; i++) {
-            for (int j = 0; j < CELLS_Y; j++) {
-                if (cell[i][j] == 0) {DrawRectangle(margin+square*i, square*j+toolsHeight, square, square, COLORS[0]);}
-                else if (cell[i][j] == 1) {DrawRectangle(margin+square*i, square*j+toolsHeight, square, square, COLORS[1]);}
-            }
-        }
+		drawGrid(cell, COLORS[selectedColor][0],COLORS[selectedColor][1]);
         for (int i = 0; i < 4; i++) {(*active_tools)[i].draw();}
 		if (!rulesFound) {DrawText("[!] Rules not found! make sure the file is named rules.txt", 16, 48, 20, BLACK);}
 		EndDrawing();
