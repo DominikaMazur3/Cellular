@@ -5,7 +5,9 @@
 #include <sstream>
 #include <string>
 
-Color COLORS[4][2] = {{Color{128,128,128,255},Color{192,192,192,255}},
+const int MAX_COLOR = 4;
+Color COLORS[MAX_COLOR][2] = {
+    {Color{128,128,128,255},Color{192,192,192,255}},
     {Color{223,255,29,255},Color{152,198,0,255}},
     {Color{255,138,183,255},Color{255,217,222,255}},
     {Color{38,0,66,255},{Color{0,115,155,255}}}};
@@ -41,14 +43,14 @@ class Button : public Selectable {
                 }
             else if (isSelected)
                 {
-                    DrawRectangleRoundedLinesEx(rect,0.1,1,3,WHITE);                    
+                    DrawRectangleRoundedLinesEx(rect,0.1,1,3,WHITE);
                     DrawRectangleRounded(rect,0.1,1,BLUE);
                     DrawRectangleRoundedLinesEx(rect,0.1,1,2,BLACK);
                     drawButtonText();
                 }
             else if (isInside())
                 {
-                    DrawRectangleRoundedLinesEx(rect,0.1,1,3,WHITE);                    
+                    DrawRectangleRoundedLinesEx(rect,0.1,1,3,WHITE);
                     DrawRectangleRounded(rect,0.1,1,LIGHTGRAY);
                     DrawRectangleRoundedLinesEx(rect,0.1,1,2,BLACK);
                     drawButtonText();
@@ -120,6 +122,11 @@ struct NEIGHBOURS4 {
 };
 
 struct RULE2 {int a; int b;};
+
+struct RULES {
+    std::vector<RULE2> general;
+    std::vector<RULE2> exact;
+};
 
 int countNeighbours(NEIGHBOURS4 neighbours, int value) {
     int count = 0;
@@ -199,13 +206,13 @@ int returnNeighboursNum(NEIGHBOURS8 n, int value=1) {
     return num;
 }
 
-void update(std::vector<std::vector<int>> &cell, std::vector<RULE2> rules, int neighboursMode)
+void update(std::vector<std::vector<int>> &cell, RULES rules, int neighboursMode)
 {
     std::vector<std::vector<int>> updated(CELLS_X, std::vector<int>(CELLS_Y,0));
     for (int i = 0; i < CELLS_X; i++) {for (int j = 0; j < CELLS_Y; j++) {updated[i][j] = cell[i][j];}}
     for (int i = 0; i < CELLS_X; i++) {for (int j = 0; j < CELLS_Y; j++) {
         int cellnum = returnNeighboursNum(returnNeighbours8(cell,i,j));
-        for(std::vector<RULE2>::iterator it = rules.begin(); it != rules.end(); it++) {
+        for(std::vector<RULE2>::iterator it = rules.general.begin(); it != rules.general.end(); it++) {
             if (neighboursMode == 8) {
             //{if (cellnum == (*it).a) {updated[i][j] = (*it).b;}} // both options will be available later
             if (countNeighbours(returnNeighbours8(cell,i,j),1) == (*it).a) {updated[i][j] = (*it).b;}}
@@ -214,17 +221,30 @@ void update(std::vector<std::vector<int>> &cell, std::vector<RULE2> rules, int n
             }
         }
     }}
+    for (int i = 0; i < CELLS_X; i++) {for (int j = 0; j < CELLS_Y; j++) {
+        for(std::vector<RULE2>::iterator it = rules.exact.begin(); it != rules.exact.end(); it++) {
+            if (neighboursMode == 8) {
+                int cellnum = returnNeighboursNum(returnNeighbours8(cell,i,j));
+                if (cellnum == (*it).a) {updated[i][j] = (*it).b;}
+            }
+            else if (neighboursMode == 4) {
+                int cellnum = returnNeighboursNum(returnNeighbours(cell,i,j));
+                if (cellnum == (*it).a) {updated[i][j] = (*it).b;}
+            }
+        }
+    }}
     for (int i = 0; i < CELLS_X; i++) {for (int j = 0; j < CELLS_Y; j++) {cell[i][j] = updated[i][j];}}
 }
 
 bool pattern = false;
 
-std::vector<RULE2> readRules(bool &rulesFound, int &neighbours)
+RULES readRules(bool &rulesFound, int &neighbours)
 {
-    std::vector<RULE2> rules;    
+    RULES rules;
     std::ifstream file("rules.txt");
     std::string line;
-    int GRID_SIZE = false; // the next line is the grid size
+    bool GRID_SIZE = false; // the next line is the grid size
+    bool EXACT = false;
     if (file.is_open()) {
         while (std::getline(file,line)) {
             std::stringstream stream(line);
@@ -237,7 +257,14 @@ std::vector<RULE2> readRules(bool &rulesFound, int &neighbours)
             if (stream >> i.a)
             {
                 if (stream >> i.b)
-                    {rules.push_back(i);}
+                    {
+                        if (!EXACT) {
+                            rules.general.push_back(i);
+                        }
+                        else {
+                            rules.exact.push_back(i);
+                        }
+                    }
             }
             else {
                 if (line.find("mode") != std::string::npos)
@@ -246,6 +273,8 @@ std::vector<RULE2> readRules(bool &rulesFound, int &neighbours)
                     else if (line.find("4") != std::string::npos) {neighbours = 4;}
                 }
                 else if (line.find("grid") != std::string::npos) {GRID_SIZE = true;}
+                else if (line.find("exact") != std::string::npos) {EXACT = true;}
+                else if (line.find("not exact") != std::string::npos) {EXACT = false;}
                 else if (line.find("pattern") != std::string::npos) {pattern = true;;}
             }
         }
@@ -271,7 +300,7 @@ std::vector<std::vector<int>> drawpattern(std::vector<std::vector<int>> cell) {
 
 void drawGrid(std::vector<std::vector<int>> &cell, Color c0, Color c1)
 {
-    const int toolsHeight = 32;    
+    const int toolsHeight = 32;
     // window scaling, work in progress
     int square = std::min(GetScreenWidth(),GetScreenHeight()-toolsHeight)/std::max(CELLS_X,CELLS_Y);
     int margin = (GetScreenWidth()-square*CELLS_X)/2;
@@ -292,7 +321,7 @@ int main ()
     bool gridSize = true;
     bool rulesFound = true;
     int neighboursMode = 8;
-    std::vector<RULE2> rules = readRules(rulesFound, neighboursMode);    
+    RULES rules = readRules(rulesFound, neighboursMode);
     std::vector<std::vector<int>> cell = createGrid();
     const float updateTime = 1.25;
     float speed = 1.0;
@@ -407,7 +436,7 @@ int main ()
             else {update(cell, rules, neighboursMode);}
         }
         else if (buttonPressed == 2) {
-            if (mode_more_tools) {selectedColor = (selectedColor+1)%4;}
+            if (mode_more_tools) {selectedColor = (selectedColor+1)%MAX_COLOR;}
             else if (mode_auto) {speed = std::min(16.0f, speed*2);}
             else {for (int i = 0; i < 10; i++) {update(cell, rules, neighboursMode);}}
         }
